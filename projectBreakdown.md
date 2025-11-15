@@ -1,191 +1,147 @@
-Here’s a more detailed breakdown for the **URL Shortener API** project.
+Absolutely. Cask is a fantastic choice for this\! It's much lighter and simpler than Akka HTTP, making it perfect for a long-weekend project where you want to focus on logic rather than boilerplate.
 
-### 🎯 Project 1: URL Shortener API
+(A quick note: **Cask** is a *server* framework, which is what you need to build the API. **sttp** is primarily a *client* library, which you would use to *call* other APIs. So for this project, Cask is the tool for the job.)
 
-This plan focuses on using **Akka HTTP** and **Circe** for a modern, idiomatic Scala feel. It's perfect for a weekend because you can start with an in-memory "database" and have a fully working app quickly.
-
------
-
-### 1\. 🛠️ Recommended Tech Stack
-
-  * **Web Framework:** **Akka HTTP**. It's a powerful library (not a full framework like Play) that gives you fine-grained control over routing and requests using its elegant DSL.
-  * **JSON Library:** **Circe**. A very popular, powerful, and functional JSON library that integrates well with Akka HTTP via the `akka-http-circe` helper library.
-  * **Storage (for the weekend):** `scala.collection.concurrent.Map`. This is a thread-safe map perfect for a simple, in-memory key-value store. It requires no database setup.
+Here is the amended plan using **Cask** and **sbt**.
 
 -----
 
-### 2\. 🗺️ Weekend Battle Plan
+### 1\. 🛠️ Revised Tech Stack
 
-Here is a step-by-step guide to structure your weekend.
+  * **Web Framework:** **Cask**. A minimal, annotation-based web framework from Li Haoyi.
+  * **JSON Library:** **ujson**. Cask's default JSON library, also by Li Haoyi. It's simple and requires no setup.
+  * **Storage:** `scala.collection.concurrent.Map`. The in-memory `TrieMap` is still the perfect thread-safe choice.
+  * **Build Tool:** **sbt**.
 
-#### Day 1: Setup and the "Shorten" Endpoint
+-----
 
-1.  **Project Setup (1-2 hours):**
+### 2\. 🗺️ Weekend Battle Plan (Cask Edition)
 
-      * Create a new Scala project using `sbt`.
-      * Add your `build.sbt` dependencies: `akka-http`, `akka-stream`, `circe-core`, `circe-generic`, `circe-parser`, and `akka-http-circe`.
+This plan is simpler because Cask bundles the server and JSON handling into one small package. You can likely fit this all in a single `.scala` file.
 
-2.  **Define Your Models (30 mins):**
+#### Day 1, Step 1: Project Setup (1 hour)
 
-      * Create `case class`es for your API. You'll need `akka-http-circe`'s `de.heikoseeberger.akkahttpcirce.FailFastCirceSupport` and `io.circe.generic.auto._`.
+Create a new sbt project. Your `build.sbt` will be very simple.
 
-    <!-- end list -->
+```scala
+// build.sbt
+scalaVersion := "2.13.12" // Or 3.x.x
 
-    ```scala
-    // In a new file, e.g., models/UrlModels.scala
-    case class ShortenRequest(url: String)
-    case class ShortenResponse(shortUrl: String)
-    ```
+libraryDependencies ++= Seq(
+  "com.lihaoyi" %% "cask" % "0.9.1",
+  // For testing, highly recommended
+  "com.lihaoyi" %% "utest" % "0.8.2" % "test"
+)
 
-3.  **Create the Storage Service (1 hour):**
+// Add this line if you want to use the utest framework
+testFrameworks += new TestFramework("utest.runner.Framework")
+```
 
-      * This service will handle the logic of storing and retrieving URLs.
+After setting this up, run `sbt` in your terminal to download the dependencies.
 
-    <!-- end list -->
+#### Day 1, Step 2: Create the Main App (3-4 hours)
 
-    ```scala
-    // In a new file, e.g., services/UrlRepository.scala
-    import scala.collection.concurrent.Map
-    import scala.util.Random
+Create a file like `src/main/scala/UrlShortener.scala`. We can put both the storage and the web routes in here.
 
-    class UrlRepository {
-      // Our in-memory "database"
-      private val urlStore: Map[String, String] = 
-        scala.collection.concurrent.TrieMap[String, String]()
+```scala
+import scala.collection.concurrent.TrieMap
+import scala.util.Random
 
-      private def generateShortKey(): String = {
-        // Simple 6-char random alphanumeric string
-        Random.alphanumeric.take(6).mkString
-      }
+// This object will hold our app's logic
+object UrlShortener extends cask.MainRoutes {
 
-      def save(longUrl: String): String = {
-        val key = generateShortKey()
-        // We'll assume no collisions for a weekend project!
-        urlStore.put(key, longUrl)
-        key
-      }
+  // 1. --- The Storage Service ---
+  // Our in-memory "database"
+  private val urlStore: TrieMap[String, String] = TrieMap[String, String]()
 
-      def find(key: String): Option[String] = {
-        urlStore.get(key)
-      }
+  private def generateShortKey(): String = {
+    // Simple 6-char random alphanumeric string
+    // We'll still assume no collisions for a weekend project!
+    Random.alphanumeric.take(6).mkString
+  }
+
+  // 2. --- The "Shorten" Endpoint (POST /shorten) ---
+  @cask.post("/shorten")
+  def shorten(request: cask.Request): cask.Response = {
+    try {
+      // Parse the JSON body using ujson
+      val json = ujson.read(request.text())
+      val longUrl = json("url").str
+
+      // Save to our "database"
+      val key = generateShortKey()
+      urlStore.put(key, longUrl)
+
+      // !! Remember to update localhost:8080 with your actual host/port
+      val shortUrl = s"http://localhost:8080/$key"
+
+      // Create a JSON response
+      cask.Response(ujson.Obj("shortUrl" -> shortUrl), statusCode = 201) // 201 Created
+
+    } catch {
+      case e: Exception =>
+        // Basic error handling
+        cask.Response(ujson.Obj("error" -> "Bad request"), statusCode = 400)
     }
-    ```
+  }
 
-4.  **Build the POST Route (2-3 hours):**
-
-      * Create your Akka HTTP routes. This is the core of the app.
-
-    <!-- end list -->
-
-    ```scala
-    // In a new file, e.g., routing/UrlRoutes.scala
-    import akka.http.scaladsl.server.{Directives, Route}
-    import akka.http.scaladsl.model.{StatusCodes}
-    import de.heikoseeberger.akkahttpcirce.FailFastCirceSupport
-
-    class UrlRoutes(repository: UrlRepository) 
-      extends Directives with FailFastCirceSupport {
-      
-      // We'll need circe's auto-derivation
-      import io.circe.generic.auto._
-      
-      val routes: Route =
-        path("shorten") {
-          post {
-            // Automatically unmarshals the JSON body to our case class
-            entity(as[ShortenRequest]) { request =>
-              val key = repository.save(request.url)
-              
-              // !! Remember to replace localhost:8080 with your actual domain/config
-              val response = ShortenResponse(s"http://localhost:8080/$key")
-              
-              complete(StatusCodes.Created, response)
-            }
-          }
-        }
+  // 3. --- The "Redirect" Endpoint (GET /:key) ---
+  @cask.get("/:key")
+  def redirect(key: String): cask.Response = {
+    urlStore.get(key) match {
+      case Some(longUrl) =>
+        // Cask has a built-in Redirect helper
+        cask.Redirect(longUrl, statusCode = 302) // 302 Found
+      case None =>
+        cask.Response(ujson.Obj("error" -> "Not found"), statusCode = 404)
     }
-    ```
+  }
 
-#### Day 2: The "Redirect" Endpoint and Server
+  // 4. --- Start the Server ---
+  println(s"Server starting at http://localhost:8080 ...")
+  initialize()
+}
+```
 
-1.  **Build the GET Route (1-2 hours):**
+#### Day 2, Step 3: Run and Test (1-2 hours)
 
-      * Add the redirect logic to your `UrlRoutes` class.
+1.  **Run the App:**
 
-    <!-- end list -->
+      * Go to your sbt shell (by typing `sbt`).
+      * Type `run`.
+      * Your server is now running\!
 
-    ```scala
-    // Inside UrlRoutes class, combine with the existing route
+2.  **Test with `curl` (or Postman):**
 
-    val routes: Route =
-      concat(
-        path("shorten") {
-          // ... (your POST route from Day 1)
-        },
-        path(Segment) { key =>
-          get {
-            repository.find(key) match {
-              case Some(longUrl) =>
-                // Send a 302 Found redirect
-                redirect(longUrl, StatusCodes.Found)
-              case None =>
-                complete(StatusCodes.NotFound, s"Short URL '$key' not found.")
-            }
-          }
-        }
-      )
-    ```
+      * **POST (Create Short URL):**
 
-2.  **Create the Main App (1 hour):**
+        ```bash
+        curl -X POST -H "Content-Type: application/json" \
+             -d '{"url":"https://www.google.com"}' \
+             http://localhost:8080/shorten
+        ```
 
-      * Create an `object` with a `main` method to tie everything together and start the server.
+        *You should get back:* `{"shortUrl":"http://localhost:8080/aBc1D"}` (with a random key)
 
-    <!-- end list -->
+      * **GET (Test Redirect):**
 
-    ```scala
-    // In a new file, e.g., Main.scala
-    import akka.actor.ActorSystem
-    import akka.http.scaladsl.Http
-    import scala.concurrent.ExecutionContext
-    import scala.io.StdIn
+          * Copy the short URL from the response (e.g., `http://localhost:8080/aBc1D`) and paste it into your browser. It should redirect you to Google.
+          * Or, use `curl -v` to see the redirect header:
+            ```bash
+            curl -v http://localhost:8080/aBc1D
+            ```
 
-    object Main {
-      def main(args: Array[String]): Unit = {
-        implicit val system: ActorSystem = ActorSystem("url-shortener")
-        implicit val ec: ExecutionContext = system.dispatcher
-
-        val repository = new UrlRepository()
-        val allRoutes = new UrlRoutes(repository).routes
-
-        val binding = Http().newServerAt("localhost", 8080).bind(allRoutes)
-
-        println(s"Server online at http://localhost:8080/\nPress RETURN to stop...")
-        StdIn.readLine() // let it run until user presses return
-
-        binding
-          .flatMap(_.unbind()) // trigger unbinding from the port
-          .onComplete(_ => system.terminate()) // and shutdown when done
-      }
-    }
-    ```
-
-3.  **Test and Refine (2-3 hours):**
-
-      * Run your `Main` app.
-      * Use a tool like `curl` or Postman to test:
-          * **POST:** `curl -X POST -H "Content-Type: application/json" -d '{"url":"https://www.google.com"}' http://localhost:8080/shorten`
-          * **GET:** Open the returned short URL (e.g., `http://localhost:8080/aBc1D`) in your browser. It should redirect you to Google.
-          * **Test 404:** Try a key that doesn't exist.
+        *You'll see a `302 Found` and a `Location: https://www.google.com` header.*
 
 -----
 
 ### 3\. 🧑‍💻 Key Scala Concepts You'll Practice
 
-  * **Case Classes & ADTs:** Perfect for modeling your JSON request/response.
-  * **Traits/Classes:** Structuring your app by separating concerns (e.g., `UrlRepository`, `UrlRoutes`).
-  * **Futures:** Akka HTTP uses `Future`s under the hood for non-blocking I/O (though the high-level DSL hides much of it).
-  * **Functional Composition:** The Akka HTTP routing DSL (e.g., `path`, `get`, `post`, `concat`) is a prime example of composing small functions.
-  * **Implicits:** Used heavily by both Akka HTTP and Circe to find the correct JSON converters (`FailFastCirceSupport`) and a "materializer" for running streams.
-  * **Collections:** Using a `concurrent.Map` for thread-safe state.
+  * **Annotations:** Cask uses `@cask.post` and `@cask.get` to define routes, which is a different (and simpler) style than Akka HTTP's DSL.
+  * **Simple JSON:** Using `ujson` directly (`ujson.read`, `ujson.Obj`) is a great, lightweight alternative to complex case class derivation with Circe.
+  * **Error Handling:** Using a simple `try/catch` or `Option.get` is very common in Cask apps for quick error responses.
+  * **Main Object:** Extending `cask.MainRoutes` is a simple way to boot a full web server.
 
-Does this detailed plan look like a good fit for your long weekend?
+This Cask-based approach significantly reduces the setup time and complexity, letting you build the "fully functional software" part even faster.
+
+How does this revised plan with Cask look for your weekend?
