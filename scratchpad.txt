@@ -36,3 +36,6 @@ https://alvinalexander.com/scala/how-to-add-update-remove-mutable-map-elements-s
 
 
 
+scala> val jk2 = scala.util.Random.alphanumeric.take(8).mkString
+val jk2: String = To294I9M
+
