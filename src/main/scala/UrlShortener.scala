@@ -1,6 +1,12 @@
 object UrlShortener extends cask.MainRoutes {
-        def shortenUrl(url: String): String = {
-                url.reverse
+
+        val store = scala.collection.mutable.Map[String, String]()
+
+        def shortenAndStoreUrl(url: String): String = {
+                val key= scala.util.Random.alphanumeric.take(10).mkString
+                store(key) = url
+
+                "http://localhost:8080/"+key
         }
 
         @cask.staticResources("/static")
@@ -8,7 +14,7 @@ object UrlShortener extends cask.MainRoutes {
 
         @cask.post("/shorten")
         def shorten(request: cask.Request) = {
-                shortenUrl(request.text())
+                shortenAndStoreUrl(request.text())
         }
 
         initialize()
