@@ -3,6 +3,7 @@ lazy val urlshortener = project.in(file("."))
     name := "urlShortener",
     scalaVersion := "2.13.16",
     libraryDependencies += "com.lihaoyi" %% "cask" % "0.10.2",
+    libraryDependencies += "com.lihaoyi" %% "scalatags" % "0.13.1",
     fork := true
   )
 

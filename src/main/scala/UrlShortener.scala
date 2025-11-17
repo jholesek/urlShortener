@@ -1,3 +1,5 @@
+import scalatags.Text.all._
+
 object UrlShortener extends cask.MainRoutes {
 
         val store = scala.collection.mutable.Map[String, String]()
@@ -13,9 +15,29 @@ object UrlShortener extends cask.MainRoutes {
         def staticEndpoint(): String="."
 
         @cask.get("/link")
-        def forwardReq(segments: cask.RemainingPathSegments): String = {
-                store(segments.value.mkString)
+        def forwardReq(segments: cask.RemainingPathSegments): doctype = {
+                //s"""<a href=""""+store(segments.value.mkString)+s"""">link</a>"""
+                //cask.Redirect(store(segments.value.mkString))
                 //segments.value.mkString
+                doctype("html") (
+                        html(
+                                head(
+                                        (s"""
+                                                <meta charset="UTF-8">
+        <meta http-equiv="refresh" content="0; url=http://example.com">
+                                        """),
+                                        meta(s"""http-equiv:="refresh""
+                                                content="0; url=http://example.com" """),
+                                        script(s"""
+            window.location.href = "http://example.com" """)
+                                ),
+                                body( p(
+                                        ("If you are not redirected automatically, follow this" ), 
+                                        a(href:="http://example.com")(p("link to example"))
+                                        )
+                                )
+                        )
+                )
         }
 
         @cask.post("/shorten")
