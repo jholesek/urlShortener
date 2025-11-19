@@ -43,29 +43,24 @@ object UrlShortener extends cask.MainRoutes {
   }
 
         @cask.get("/link")
-        def forwardReq(segments: cask.RemainingPathSegments): doctype = {
+        def forwardReq(segments: cask.RemainingPathSegments): cask.Response[String] = {
                 //s"""<a href=""""+store(segments.value.mkString)+s"""">link</a>"""
                 //cask.Redirect(store(segments.value.mkString))
                 //segments.value.mkString
-                doctype("html") (
-                        html(
-                                head(
-                                        (s"""
-                                                <meta charset="UTF-8">
-        <meta http-equiv="refresh" content="0; url=http://example.com">
-                                        """),
-                                        meta(s"""http-equiv:="refresh""
-                                                content="0; url=http://example.com" """),
-                                        script(s"""
-            window.location.href = "http://example.com" """)
-                                ),
-                                body( p(
-                                        ("If you are not redirected automatically, follow this" ), 
-                                        a(href:="http://example.com")(p("link to example"))
-                                        )
-                                )
-                        )
-                )
+                val html =
+                        """<!DOCTYPE HTML>
+                                <html lang="en-US">
+                                <head>
+                                <meta charset="UTF-8">
+                                <meta http-equiv="refresh" content="0; url=http://example.com">
+                                <title>Page Redirection</title>
+                                </head>
+                                <body>
+                                        If you are not redirected automatically, follow this <a href='http://example.com'>link to example</a>.
+                                </body>
+                                </html>""".stripMargin
+                cask.Response(data = html, headers = Seq("Content-Type" -> "text/html"))
+                
         }
 
         @cask.post("/shorten")
