@@ -46,17 +46,18 @@ object UrlShortener extends cask.MainRoutes {
         def forwardReq(segments: cask.RemainingPathSegments): cask.Response[String] = {
                 //s"""<a href=""""+store(segments.value.mkString)+s"""">link</a>"""
                 //cask.Redirect(store(segments.value.mkString))
-                //segments.value.mkString
+                val redir = store(segments.value.mkString)
+                println(redir)
                 val html =
                         """<!DOCTYPE HTML>
                                 <html lang="en-US">
                                 <head>
                                 <meta charset="UTF-8">
-                                <meta http-equiv="refresh" content="0; url=http://example.com">
+                                <meta http-equiv="refresh" content="0; url="""+redir+s""" ">
                                 <title>Page Redirection</title>
                                 </head>
                                 <body>
-                                        If you are not redirected automatically, follow this <a href='http://example.com'>link to example</a>.
+                                        If you are not redirected automatically, follow this <a href='"""+redir+"""'>link """+redir+"""</a>.
                                 </body>
                                 </html>""".stripMargin
                 cask.Response(data = html, headers = Seq("Content-Type" -> "text/html"))
