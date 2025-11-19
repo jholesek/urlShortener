@@ -11,8 +11,36 @@ object UrlShortener extends cask.MainRoutes {
                 "http://localhost:8080/link/"+key
         }
 
-        @cask.staticResources("/static")
-        def staticEndpoint(): String="."
+        @cask.staticFiles("/static")
+        def staticEndpoint(): String="src/main/resources"
+
+        @cask.get("/check")
+        def returnCheck(): cask.Response[String] = {
+                cask.Response("""<!doctype html>
+                        |<html><body>krneki</body></html>
+                        """.stripMargin,
+                        headers = Seq("Content-Type" -> "text/html")
+                        )
+        }
+
+  @cask.get("/login")
+  def getLogin(): cask.Response[String] = {
+    val html =
+      """<!doctype html>
+        |<html>
+        |<body>
+        |<form action="/login" method="post">
+        |  <label for="name">Username:</label><br>
+        |  <input type="text" name="name" value=""><br>
+        |  <label for="password">Password:</label><br>
+        |  <input type="text" name="password" value=""><br><br>
+        |  <input type="submit" value="Submit">
+        |</form>
+        |</body>
+        |</html>""".stripMargin
+
+    cask.Response(data = html, headers = Seq("Content-Type" -> "text/html"))
+  }
 
         @cask.get("/link")
         def forwardReq(segments: cask.RemainingPathSegments): doctype = {
